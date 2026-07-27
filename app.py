@@ -7,12 +7,37 @@ import boto3
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
+from prometheus_flask_exporter import PrometheusMetrics
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
 
 load_dotenv()
 
 app = Flask(__name__)
+
+# Configuração Prometheus
+metrics = PrometheusMetrics(app)
+metrics.info('app_info', 'Volunteer Service', version='1.0.0')
+
+# Configuração OpenTelemetry
+resource = Resource(attributes={SERVICE_NAME: "volunteer-service"})
+trace.set_tracer_provider(TracerProvider(resource=resource))
+tracer_provider = trace.get_tracer_provider()
+try:
+    otlp_exporter = OTLPSpanExporter(endpoint="http://tempo.monitoring.svc:4318/v1/traces")
+    tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+except Exception as e:
+    log.warning(f"Failed to configure OpenTelemetry: {e}")
+
+FlaskInstrumentor().instrument_app(app)
+
 
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 DYNAMODB_TABLE = os.getenv("AWS_DYNAMODB_TABLE")
