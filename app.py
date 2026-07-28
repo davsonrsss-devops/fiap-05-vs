@@ -80,6 +80,15 @@ def register_volunteer():
         log.error(f"Erro ao salvar voluntário no DynamoDB: {e}")
         return jsonify({"error": "Erro interno ao processar dados"}), 500
 
+@app.route('/volunteers', methods=['GET'])
+def get_all_volunteers():
+    try:
+        response = table.scan()
+        return jsonify(response.get('Items', [])), 200
+    except Exception as e:
+        log.error(f"Erro ao buscar dados no DynamoDB: {e}")
+        return jsonify({"error": "Erro interno"}), 500
+
 @app.route('/volunteers/<int:ngo_id>', methods=['GET'])
 def get_volunteers_by_ngo(ngo_id):
     try:
